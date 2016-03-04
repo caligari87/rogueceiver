@@ -3,7 +3,7 @@
 
 `MajorVersion.MinorVersion.Bugfix`
 
-Trying to follow rules for [Semantic Versioning](http://semver.org/), although there is no API so backwards-compatibility isn't much of an issue. `Bugfix` may only increment once for mulitple changes unless I do a *lot* of stuff.
+Trying to follow rules for [Semantic Versioning](http://semver.org/), although there is no API so backwards-compatibility isn't much of an issue. `Bugfix` may only increment once for multiple changes unless I do a *lot* of stuff.
 
 * * * 
 
