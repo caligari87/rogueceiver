@@ -4,11 +4,27 @@ CONST True = 1
 CONST False = 0
 
 'Key Definitions
-Action_EjectMag$ = "E"
-Action_PullTrigger$ = "F"
+Action_Quit$ = "q"
+Action_Help$ = "?"
+
+Action_EjectMag$ = "e"
+Action_PullTrigger$ = "f"
+Action_PullSlide$ = "p"
+Action_SlideRelease$ = "r"
+Action_Safety$ = "s"
+Action_ChamberCheck$ = "c"
+Action_MagSwap$ = "m"
+Action_GetLooseRound$ = "g"
+Action_LoadRound$ = "z"
+Action_UnloadRound$ = "Z"
+Action_Look$ = "l"
+Action_DetailedLook$ = "L"
+Action_MoveNorth$ = CHR$(0) + "H"
+Action_MoveSouth$ = CHR$(0) + "P"
+Action_MoveEast$ = CHR$(0) + "M"
+Action_MoveWest$ = CHR$(0) + "K"
 
 DIM Quit AS _UNSIGNED _BIT
-
 Quit = False
 
 TYPE RoomDef
@@ -17,7 +33,7 @@ TYPE RoomDef
     ExitS AS INTEGER
     ExitE AS INTEGER
     ExitW AS INTEGER
-	Description as INTEGER
+    Description AS INTEGER
 END TYPE
 
 TYPE PlayerDef
@@ -75,7 +91,6 @@ Player.YPos = CINT(9 * RND + 1)
 DO
     _LIMIT 20
 
-    'GOSUB PrintOptions
     GOSUB GetInput
     GOSUB DoAction
 
@@ -88,23 +103,33 @@ SYSTEM 'Exit immediately
 '====MAIN SUBROUTINES===
 
 
-PrintOptions:
-VIEW PRINT 20 TO 25
+PrintHelp:
 CLS
-LOCATE 20, 1
-COLOR 0, 7: PRINT "F";: COLOR 7, 0: PRINT "ire  ";
-COLOR 0, 7: PRINT "P";: COLOR 7, 0: PRINT "ull slide  ";
-COLOR 0, 7: PRINT "E";: COLOR 7, 0: IF (Pistol1911.MagInserted <> 0) THEN PRINT "ject mag  "; ELSE PRINT " Insert mag  ";
-COLOR 0, 7: PRINT "S";: COLOR 7, 0: PRINT "afety  ";
-COLOR 0, 7: PRINT "C";: COLOR 7, 0: PRINT "hamber check  ";
-COLOR 0, 7: PRINT "M";: COLOR 7, 0: PRINT "ag swap  "
-COLOR 0, 7: PRINT "G";: COLOR 7, 0: PRINT "et loose rounds  ";
-COLOR 0, 7: PRINT "L";: COLOR 7, 0: PRINT "oad round  ";
-COLOR 0, 7: PRINT "U";: COLOR 7, 0: PRINT "nload round  "
-
+PRINT Action_Quit$, "Quit"
+PRINT Action_Help$, "Help"
 PRINT
-COLOR 0, 7: PRINT "Q";: COLOR 7, 0: PRINT "uit"
-COLOR 7
+PRINT Action_EjectMag$, "Eject/Insert magazine"
+PRINT Action_PullTrigger$, "Pull trigger"
+PRINT Action_PullSlide$, "Pull slide"
+PRINT Action_SlideRelease$, "Slide Release"
+PRINT Action_Safety$, "Toggle safety"
+PRINT Action_ChamberCheck$, "Press check chamber"
+PRINT Action_MagSwap$, "Swap magazines (if mag in hand)"
+PRINT Action_GetLooseRound$, "Grab loose rounds from floor"
+PRINT Action_LoadRound$, "Load a round (if mag in hand)"
+PRINT Action_UnloadRound$, "Unload a round (if mag in hand)"
+PRINT Action_Look$, "Quick glance around"
+PRINT Action_DetailedLook$, "Look closely at something"
+PRINT Action_MoveNorth$, "Move North"
+PRINT Action_MoveSouth$, "Move South"
+PRINT Action_MoveEast$, "Move East"
+PRINT Action_MoveWest$, "Move West"
+PRINT
+PRINT "Press any key to continue..."
+SLEEP
+CLS
+_KEYCLEAR
+RETURN
 
 VIEW PRINT 1 TO 10
 CLS
@@ -124,11 +149,15 @@ RETURN
 
 
 GetInput:
-K$ = "": DO: LOOP UNTIL INKEY$ = ""
+K$ = "": _KEYCLEAR
 DO
     _LIMIT 20
-    K$ = UCASE$(INKEY$)
+    K$ = INKEY$
 LOOP WHILE K$ = ""
+_KEYCLEAR
+Row = CSRLIN: Col = POS(0)
+LOCATE 2, 70: PRINT K$
+LOCATE Row, Col
 RETURN
 
 
@@ -146,7 +175,7 @@ SELECT CASE K$
             PRINT "Nothing happens."
         END IF
 
-    CASE "P" 'Pull Slide
+    CASE Action_PullSlide$ 'Pull Slide
         PRINT "You pull the slide back. ";
         GOSUB CycleAction
         IF (Pistol1911.SlideLocked = 1) THEN
@@ -155,13 +184,19 @@ SELECT CASE K$
             PRINT "The slide snaps forward."
         END IF
 
+    CASE Action_SlideRelease$ 'Slide release
+        IF (Pistol1911.SlideLocked = 1) THEN
+            PRINT "You toggle the release and the slide snaps forward. "
+            Pistol1911.SlideLocked = 0
+        END IF
+
     CASE Action_EjectMag$ 'Eject/Insert Mag
         GOSUB EjectMag
 
-    CASE "S" 'Toggle Safety
+    CASE Action_Safety$ 'Toggle Safety
         GOSUB ToggleSafety
 
-    CASE "C" 'Chamber press check
+    CASE Action_ChamberCheck$ 'Chamber press check
         IF (Pistol1911.SlideLocked = False) THEN PRINT "You pull the slide partially back. "; ELSE PRINT "The slide is locked back. ";
         IF Pistol1911.RoundInChamber = 1 THEN
             PRINT "There is a round in the chamber."
@@ -169,17 +204,17 @@ SELECT CASE K$
             PRINT "There is no round in the chamber."
         END IF
 
-    CASE "M" 'Swap another magazine while holding.
+    CASE Action_MagSwap$ 'Swap another magazine while holding.
         IF (Player.MagInHand <> 0) THEN GOSUB MagSwap
 
-    CASE "G" 'GetLooseRounds
+    CASE Action_GetLooseRound$ 'GetLooseRounds
         IF (Room(Player.XPos, Player.YPos).LooseRounds > 0) THEN
             Room(Player.XPos, Player.YPos).LooseRounds = Room(Player.XPos, Player.YPos).LooseRounds - 1
             Player.LooseRounds = Player.LooseRounds + 1
             PRINT "You pick up a loose round from the floor."
         END IF
 
-    CASE "L" 'Load a round into the in-hand magazine
+    CASE Action_LoadRound$ 'Load a round into the in-hand magazine
         IF (Player.MagInHand <> 0) AND (Player.LooseRounds > 0) THEN
             IF (Mag1911.RoundsInMag(Player.MagInHand) < 8) THEN
                 Mag1911.RoundsInMag(Player.MagInHand) = Mag1911.RoundsInMag(Player.MagInHand) + 1
@@ -189,7 +224,7 @@ SELECT CASE K$
                 PRINT "The magazine is full. "
             END IF
         END IF
-    CASE "U" 'Unload round from in-hand magazine to inventory
+    CASE Action_UnloadRound$ 'Unload round from in-hand magazine to inventory
         IF (Player.MagInHand <> 0) AND (Mag1911.RoundsInMag(Player.MagInHand) > 0) THEN
             Mag1911.RoundsInMag(Player.MagInHand) = Mag1911.RoundsInMag(Player.MagInHand) - 1
             Player.LooseRounds = Player.LooseRounds + 1
@@ -198,7 +233,7 @@ SELECT CASE K$
             PRINT "The magazine is empty. "
         END IF
 
-    CASE CHR$(0) + "H" 'Move north 1 room
+    CASE Action_MoveNorth$ 'Move north 1 room
         IF (Room(Player.XPos, Player.YPos).ExitN = 1) AND Player.YPos > 1 THEN
             Player.YPos = Player.YPos - 1
             PRINT "You move north into the next room."
@@ -206,7 +241,7 @@ SELECT CASE K$
             PRINT "No exit that way. "
         END IF
 
-    CASE CHR$(0) + "P" 'Move south 1 room
+    CASE Action_MoveSouth$ 'Move south 1 room
         IF (Room(Player.XPos, Player.YPos).ExitS = 1) AND Player.YPos < 10 THEN
             Player.YPos = Player.YPos + 1
             PRINT "You move south into the next room."
@@ -214,7 +249,7 @@ SELECT CASE K$
             PRINT "No exit that way. "
         END IF
 
-    CASE CHR$(0) + "M" 'Move east 1 room
+    CASE Action_MoveEast$ 'Move east 1 room
         IF (Room(Player.XPos, Player.YPos).ExitE = 1) AND Player.XPos < 10 THEN
             Player.XPos = Player.XPos + 1
             PRINT "You move east into the next room."
@@ -222,7 +257,7 @@ SELECT CASE K$
             PRINT "No exit that way. "
         END IF
 
-    CASE CHR$(0) + "K" 'Move west 1 room
+    CASE Action_MoveWest$ 'Move west 1 room
         IF (Room(Player.XPos, Player.YPos).ExitW = 1) AND Player.XPos > 1 THEN
             Player.XPos = Player.XPos - 1
             PRINT "You move west into the next room."
@@ -231,8 +266,11 @@ SELECT CASE K$
         END IF
 
 
-    CASE "Q" 'Quit
+    CASE Action_Quit$ 'Quit
         Quit = True
+        
+    CASE Action_Help$
+        GOSUB PrintHelp
 
 END SELECT
 RETURN
