@@ -1,6 +1,6 @@
 RANDOMIZE TIMER
 
-CONST True = 0
+CONST True = 1
 CONST False = 0
 
 'Key Definitions
