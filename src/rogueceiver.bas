@@ -7,6 +7,7 @@ CONST False = 0
 Action_Quit$ = "q"
 Action_Help$ = "?"
 
+Action_Aim$ = "a"
 Action_EjectMag$ = "e"
 Action_PullTrigger$ = "f"
 Action_PullSlide$ = "p"
@@ -41,6 +42,8 @@ TYPE PlayerDef
     LooseRounds AS INTEGER
     XPos AS INTEGER
     YPos AS INTEGER
+    WeaponRaised AS INTEGER 
+    AccuracyFactor AS SINGLE 'Decimal percentage
 END TYPE
 
 TYPE MagDef
@@ -79,15 +82,17 @@ FOR ix = 1 TO 10
         LOOP UNTIL (Room(ix, iy).ExitN + Room(ix, iy).ExitS + Room(ix, iy).ExitE + Room(ix, iy).ExitW) >= 1
     NEXT
 NEXT
+
+
 Player.LooseRounds = INT(10 * RND)
 Player.XPos = CINT(9 * RND + 1)
 Player.YPos = CINT(9 * RND + 1)
 
 
 
-
 'Main loop
 
+GOSUB Look
 DO
     _LIMIT 20
 
@@ -131,21 +136,6 @@ CLS
 _KEYCLEAR
 RETURN
 
-VIEW PRINT 1 TO 10
-CLS
-LOCATE 1, 1
-PRINT Room(Player.XPos, Player.YPos).Description
-PRINT "Your weapon is a .45 1911. "
-PRINT "The safety is ";: IF Pistol1911.SafetyOn = True THEN PRINT "ON. " ELSE PRINT "OFF. "
-PRINT "The slide is ";: IF Pistol1911.SlideLocked = True THEN PRINT "back. " ELSE PRINT "forward. "
-PRINT "There is ";: IF Pistol1911.MagInserted <> 0 THEN PRINT "a magazine inserted. " ELSE PRINT "no magazine inserted. "
-IF (Player.MagInHand <> 0) THEN PRINT "You hold magazine"; Player.MagInHand; "with"; Mag1911.RoundsInMag(Player.MagInHand); "round(s) loaded. You have"; Player.LooseRounds; "spare rounds to load."
-IF (Room(Player.XPos, Player.YPos).LooseRounds > 0) THEN PRINT "There are"; Room(Player.XPos, Player.YPos).LooseRounds; "loose rounds on the floor."
-
-VIEW PRINT 11 TO 15
-LOCATE 15, 1
-RETURN
-
 
 
 GetInput:
@@ -156,8 +146,19 @@ DO
 LOOP WHILE K$ = ""
 _KEYCLEAR
 Row = CSRLIN: Col = POS(0)
-LOCATE 2, 70: PRINT K$
+LOCATE 1, 78: PRINT K$
 LOCATE Row, Col
+RETURN
+
+
+
+Look:
+PRINT "Your weapon is a .45 1911. "
+PRINT "The safety is ";: IF Pistol1911.SafetyOn = True THEN PRINT "ON. " ELSE PRINT "OFF. "
+PRINT "The slide is ";: IF Pistol1911.SlideLocked = True THEN PRINT "back. " ELSE PRINT "forward. "
+PRINT "There is ";: IF Pistol1911.MagInserted <> 0 THEN PRINT "a magazine inserted. " ELSE PRINT "no magazine inserted. "
+IF (Room(Player.XPos, Player.YPos).LooseRounds > 0) THEN PRINT "There are"; Room(Player.XPos, Player.YPos).LooseRounds; "loose rounds on the floor."
+PRINT "You have";Player.LooseRounds;"loose round(s) on your person."
 RETURN
 
 
@@ -166,29 +167,13 @@ DoAction:
 SELECT CASE K$
 
     CASE Action_PullTrigger$ 'Pull Trigger
-        IF (Pistol1911.RoundInChamber = 1) AND (Pistol1911.SafetyOn = 0) THEN
-            Pistol1911.TriggerPulled = 1
-            PRINT "BANG! ";
-            GOSUB CycleAction
-            IF (Pistol1911.SlideLocked = 1) THEN PRINT "The slide locks back." ELSE PRINT
-        ELSE
-            PRINT "Nothing happens."
-        END IF
+        GOSUB PullTrigger
 
     CASE Action_PullSlide$ 'Pull Slide
-        PRINT "You pull the slide back. ";
-        GOSUB CycleAction
-        IF (Pistol1911.SlideLocked = 1) THEN
-            PRINT "The slide stays locked in place."
-        ELSE
-            PRINT "The slide snaps forward."
-        END IF
+        GOSUB PullSlide
 
     CASE Action_SlideRelease$ 'Slide release
-        IF (Pistol1911.SlideLocked = 1) THEN
-            PRINT "You toggle the release and the slide snaps forward. "
-            Pistol1911.SlideLocked = 0
-        END IF
+        GOSUB SlideRelease
 
     CASE Action_EjectMag$ 'Eject/Insert Mag
         GOSUB EjectMag
@@ -197,41 +182,22 @@ SELECT CASE K$
         GOSUB ToggleSafety
 
     CASE Action_ChamberCheck$ 'Chamber press check
-        IF (Pistol1911.SlideLocked = False) THEN PRINT "You pull the slide partially back. "; ELSE PRINT "The slide is locked back. ";
-        IF Pistol1911.RoundInChamber = 1 THEN
-            PRINT "There is a round in the chamber."
-        ELSE
-            PRINT "There is no round in the chamber."
-        END IF
+        GOSUB ChamberCheck
 
     CASE Action_MagSwap$ 'Swap another magazine while holding.
-        IF (Player.MagInHand <> 0) THEN GOSUB MagSwap
+        GOSUB MagSwap
 
-    CASE Action_GetLooseRound$ 'GetLooseRounds
-        IF (Room(Player.XPos, Player.YPos).LooseRounds > 0) THEN
-            Room(Player.XPos, Player.YPos).LooseRounds = Room(Player.XPos, Player.YPos).LooseRounds - 1
-            Player.LooseRounds = Player.LooseRounds + 1
-            PRINT "You pick up a loose round from the floor."
-        END IF
+    CASE Action_GetLooseRound$ 'GetLooseRound
+        GOSUB GetLooseRound
 
     CASE Action_LoadRound$ 'Load a round into the in-hand magazine
-        IF (Player.MagInHand <> 0) AND (Player.LooseRounds > 0) THEN
-            IF (Mag1911.RoundsInMag(Player.MagInHand) < 8) THEN
-                Mag1911.RoundsInMag(Player.MagInHand) = Mag1911.RoundsInMag(Player.MagInHand) + 1
-                Player.LooseRounds = Player.LooseRounds - 1
-                PRINT "You load a round into the magazine. "
-            ELSE
-                PRINT "The magazine is full. "
-            END IF
-        END IF
+        GOSUB LoadRound
+        
     CASE Action_UnloadRound$ 'Unload round from in-hand magazine to inventory
-        IF (Player.MagInHand <> 0) AND (Mag1911.RoundsInMag(Player.MagInHand) > 0) THEN
-            Mag1911.RoundsInMag(Player.MagInHand) = Mag1911.RoundsInMag(Player.MagInHand) - 1
-            Player.LooseRounds = Player.LooseRounds + 1
-            PRINT "You unload a round from the magazine. "
-        ELSE
-            PRINT "The magazine is empty. "
-        END IF
+        GOSUB UnloadRound
+        
+    CASE Action_Aim$ 'Aim at a target to increase accuracy
+        GOSUB Aim
 
     CASE Action_MoveNorth$ 'Move north 1 room
         IF (Room(Player.XPos, Player.YPos).ExitN = 1) AND Player.YPos > 1 THEN
@@ -264,7 +230,9 @@ SELECT CASE K$
         ELSE
             PRINT "No exit that way. "
         END IF
-
+        
+    CASE Action_Look$
+        GOSUB Look        
 
     CASE Action_Quit$ 'Quit
         Quit = True
@@ -280,6 +248,7 @@ RETURN
 
 '===WEAPON SUBROUTINES===
 CycleAction:
+Player.AccuracyFactor = 0
 IF (Pistol1911.RoundInChamber = 1) THEN
     Pistol1911.RoundInChamber = 0
     Pistol1911.SlideLocked = 0
@@ -307,10 +276,11 @@ RETURN
 
 
 EjectMag:
+Player.AccuracyFactor = 0
 IF (Pistol1911.MagInserted <> 0) THEN
     Player.MagInHand = Pistol1911.MagInserted
     Pistol1911.MagInserted = 0
-    PRINT "You eject the magazine."
+    PRINT "You eject the magazine. There are"; Mag1911.RoundsInMag(Player.MagInHand); "round(s) loaded."
 ELSEIF (Pistol1911.MagInserted = 0) THEN
     Pistol1911.MagInserted = Player.MagInHand
     Player.MagInHand = 0
@@ -318,20 +288,129 @@ ELSEIF (Pistol1911.MagInserted = 0) THEN
 END IF
 RETURN
 
+
+
 ToggleSafety:
-PRINT "You toggle the thumb safety."
+Player.AccuracyFactor = Player.AccuracyFactor / 2
+PRINT "You toggle the thumb safety ";
 Pistol1911.SafetyOn = 1 - Pistol1911.SafetyOn
+IF Pistol1911.SafetyOn = 1 THEN PRINT "on." ELSE PRINT "off."
 RETURN
 
 
 
 MagSwap:
+IF (Player.MagInHand = 0) THEN RETURN
 PRINT "Which magazine to grab? (";
 FOR i = 1 TO 3
     IF i <> Player.MagInHand THEN PRINT i;
 NEXT
 PRINT ")"
 DO: GOSUB GetInput: LOOP UNTIL (VAL(K$) <> Player.MagInHand) AND ((VAL(K$) = 1) OR (VAL(K$) = 2) OR (VAL(K$) = 3))
-PRINT "You swap magazine"; Player.MagInHand; "for magazine "; K$; "."
 Player.MagInHand = VAL(K$)
+PRINT "You swap magazine"; Player.MagInHand; "for magazine "; K$; ". There are"; Mag1911.RoundsInMag(Player.MagInHand); "round(s) loaded."
+RETURN
+
+
+
+UnloadRound:
+IF (Player.MagInHand <> 0) AND (Mag1911.RoundsInMag(Player.MagInHand) > 0) THEN
+    Mag1911.RoundsInMag(Player.MagInHand) = Mag1911.RoundsInMag(Player.MagInHand) - 1
+    Player.LooseRounds = Player.LooseRounds + 1
+    PRINT "You unload a round from the magazine."; Mag1911.RoundsInMag(Player.MagInHand); "rounds still loaded. "
+ELSE
+    PRINT "The magazine is empty. "
+END IF
+RETURN
+
+
+
+LoadRound:
+IF (Player.MagInHand <> 0) AND (Player.LooseRounds > 0) THEN
+    IF (Mag1911.RoundsInMag(Player.MagInHand) < 8) THEN
+        Mag1911.RoundsInMag(Player.MagInHand) = Mag1911.RoundsInMag(Player.MagInHand) + 1
+        Player.LooseRounds = Player.LooseRounds - 1
+        PRINT "You load a round into the magazine."; Mag1911.RoundsInMag(Player.MagInHand); "rounds now loaded. "
+    ELSE
+        PRINT "The magazine is full. "
+    END IF
+END IF
+RETURN
+
+
+
+PullTrigger:
+Player.AccuracyFactor = Player.AccuracyFactor / 2
+IF (Pistol1911.RoundInChamber = 1) AND (Pistol1911.SafetyOn = 0) THEN
+    Pistol1911.TriggerPulled = 1
+    PRINT "BANG! ";
+    GOSUB CycleAction
+    IF (Pistol1911.SlideLocked = 1) THEN PRINT "The slide locks back." ELSE PRINT
+ELSE
+    PRINT "Nothing happens."
+END IF
+RETURN
+
+
+
+ChamberCheck:
+Player.AccuracyFactor = 0
+IF (Pistol1911.SlideLocked = False) THEN PRINT "You pull the slide partially back. "; ELSE PRINT "The slide is locked back. ";
+IF Pistol1911.RoundInChamber = 1 THEN
+    PRINT "There is a round in the chamber."
+ELSE
+    PRINT "There is no round in the chamber."
+END IF
+RETURN
+
+
+
+GetLooseRound:
+Player.AccuracyFactor = 0
+IF (Room(Player.XPos, Player.YPos).LooseRounds > 0) THEN
+    Room(Player.XPos, Player.YPos).LooseRounds = Room(Player.XPos, Player.YPos).LooseRounds - 1
+    Player.LooseRounds = Player.LooseRounds + 1
+    PRINT "You pick up a loose round from the floor."
+END IF
+RETURN
+
+
+
+PullSlide:
+Player.AccuracyFactor = 0
+PRINT "You pull the slide back. ";
+GOSUB CycleAction
+IF (Pistol1911.SlideLocked = 1) THEN
+    PRINT "The slide stays locked in place."
+ELSE
+    PRINT "The slide snaps forward."
+END IF
+RETURN
+
+
+
+SlideRelease:
+Player.AccuracyFactor = Player.AccuracyFactor / 2
+IF (Pistol1911.SlideLocked = 1) THEN
+    PRINT "You toggle the release and the slide snaps forward. "
+    Pistol1911.SlideLocked = 0
+    IF (Pistol1911.MagInserted<>0 AND Pistol1911.RoundInChamber = 0 AND Mag1911.RoundsInMag(Pistol1911.MagInserted) > 0) THEN
+        Pistol1911.RoundInChamber = 1
+        Mag1911.RoundsInMag(Pistol1911.MagInserted) = Mag1911.RoundsInMag(Pistol1911.MagInserted) - 1
+    END IF
+END IF
+RETURN
+
+
+
+Aim:
+IF Player.WeaponRaised = 0 THEN
+    Player.WeaponRaised = 1
+    PRINT "You raise the pistol to an aiming position. ";
+END IF
+Player.AccuracyFactor = Player.AccuracyFactor + ((1 - Player.AccuracyFactor) / 2)
+SELECT CASE Player.AccuracyFactor
+    CASE > 0 
+        PRINT ""; Player.AccuracyFactor
+END SELECT    
 RETURN
